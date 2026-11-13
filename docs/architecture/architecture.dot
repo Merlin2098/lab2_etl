@@ -1,0 +1,156 @@
+// Lab 2 — ETL serverless medallion: recursos AWS gestionados por Terraform.
+// Un cluster por módulo de infra/modules/. Nombres con <p> = <proyecto>-<entorno>.
+//
+// Leyenda de aristas:
+//   sólida        flujo de datos / ejecución
+//   discontinua   rol IAM que asume el servicio
+//   punteada      escritura de logs
+//
+// Renderizar:  dot -Tpng docs/architecture/architecture.dot -o docs/architecture/arch2.png
+
+digraph lab2_etl {
+    graph [
+        label = "Lab 2 — ETL serverless medallion (Andes Freight)\nRecursos AWS gestionados por Terraform, agrupados por módulo",
+        labelloc = t, fontsize = 18, fontname = "Helvetica",
+        rankdir = LR, compound = true, newrank = true,
+        nodesep = 0.45, ranksep = 0.9, pad = 0.4
+    ];
+    node [shape = box, style = "rounded,filled", fontname = "Helvetica",
+          fontsize = 11, fillcolor = "#ffffff", color = "#5f6b7a"];
+    edge [fontname = "Helvetica", fontsize = 9, color = "#3b4552"];
+
+    // ---------------------------------------------------------------- fuera de AWS
+    generator [label = "generate_envios_csv.py\n(local, simula export del TMS)",
+               shape = note, fillcolor = "#f2f2f2"];
+    analyst   [label = "Analista / consola\n(Glue Tables, S3)",
+               shape = ellipse, fillcolor = "#f2f2f2"];
+
+    // ---------------------------------------------------------------- módulo s3
+    subgraph cluster_s3 {
+        label = "modules/s3"; style = "rounded,filled"; fillcolor = "#e8f4ea"; color = "#3f8f4f";
+
+        bucket [label = "aws_s3_bucket.lake\n<p>-<cuenta>-lake\nSSE-S3 · block public access\nversionado Disabled · force_destroy",
+                fillcolor = "#c9e8cf"];
+        bronze [label = "bronze/envios/\ningest_date=YYYY-MM-DD/envios.csv", shape = folder];
+        silver [label = "silver/envios/\n*.parquet", shape = folder];
+        gold   [label = "gold/desempeno_rutas/\n*.parquet", shape = folder];
+        code   [label = "aws_s3_object.code\nscripts/*.py · scripts/sql/*.sql\nscripts/contracts/*.json", shape = folder];
+        tmp    [label = "tmp/\n(TempDir de Glue)", shape = folder];
+        notify [label = "aws_s3_bucket_notification\neventbridge = true", shape = component];
+
+        bucket -> {bronze silver gold code tmp} [arrowhead = none, color = "#7fb28a"];
+    }
+
+    // ---------------------------------------------------------------- módulo eventbridge
+    subgraph cluster_eventbridge {
+        label = "modules/eventbridge"; style = "rounded,filled"; fillcolor = "#fdeee6"; color = "#c2571a";
+
+        rule   [label = "aws_cloudwatch_event_rule\n<p>-bronze-upload\nObject Created · prefijo bronze/envios/"];
+        target [label = "aws_cloudwatch_event_target\n-> máquina de estados", shape = component];
+        role_events [label = "aws_iam_role\n<p>-events-role\nstates:StartExecution (solo esta máquina)",
+                     shape = hexagon, fillcolor = "#fff4cc"];
+    }
+
+    // ---------------------------------------------------------------- módulo stepfunctions
+    subgraph cluster_stepfunctions {
+        label = "modules/stepfunctions"; style = "rounded,filled"; fillcolor = "#f1eafa"; color = "#7a4fb3";
+
+        role_sfn [label = "aws_iam_role\n<p>-sfn-role\nGlue jobs/crawlers del lab + log delivery",
+                  shape = hexagon, fillcolor = "#fff4cc"];
+
+        subgraph cluster_sfn_machine {
+            label = "aws_sfn_state_machine  <p>-pipeline  (STANDARD)";
+            style = "rounded,dashed"; color = "#7a4fb3"; fillcolor = "#f8f4fd";
+
+            st_b2s    [label = "BronzeToSilver\nglue:startJobRun.sync"];
+            st_cw_s   [label = "Crawler silver\nStart -> Wait -> GetCrawler -> Choice"];
+            st_s2g    [label = "SilverToGold\nglue:startJobRun.sync"];
+            st_cw_g   [label = "Crawler gold\nStart -> Wait -> GetCrawler -> Choice"];
+            st_ok     [label = "PipelineSucceeded", shape = doublecircle, fillcolor = "#c9e8cf", fontsize = 9];
+            st_fail   [label = "PipelineFailed\n(Catch States.ALL)", shape = octagon, fillcolor = "#f6c9c9", fontsize = 9];
+
+            st_b2s -> st_cw_s -> st_s2g -> st_cw_g -> st_ok;
+            {st_b2s st_cw_s st_s2g st_cw_g} -> st_fail [style = dashed, color = "#b04a4a", arrowsize = 0.6];
+        }
+    }
+
+    // ---------------------------------------------------------------- módulo glue
+    subgraph cluster_glue {
+        label = "modules/glue"; style = "rounded,filled"; fillcolor = "#e7f0fb"; color = "#2f6db3";
+
+        job_b2s [label = "aws_glue_job\n<p>-bronze-to-silver\nGlue 5.1 · 2×G.1X · timeout 10 min"];
+        job_s2g [label = "aws_glue_job\n<p>-silver-to-gold\nGlue 5.1 · 2×G.1X · timeout 10 min"];
+        cr_s    [label = "aws_glue_crawler\n<p>-silver-crawler\nprefijo silver_ · UPDATE_IN_DATABASE"];
+        cr_g    [label = "aws_glue_crawler\n<p>-gold-crawler\nprefijo gold_ · UPDATE_IN_DATABASE"];
+
+        subgraph cluster_catalog {
+            label = "Glue Data Catalog"; style = "rounded,dashed"; color = "#2f6db3"; fillcolor = "#f3f8fe";
+            db    [label = "aws_glue_catalog_database\n<p con _>", shape = cylinder, fillcolor = "#d6e6f8"];
+            t_s   [label = "silver_envios\n(creada por el crawler)", shape = tab, style = "filled,dashed"];
+            t_g   [label = "gold_desempeno_rutas\n(creada por el crawler)", shape = tab, style = "filled,dashed"];
+            db -> {t_s t_g} [arrowhead = none, color = "#7fa7d6"];
+        }
+    }
+
+    // ---------------------------------------------------------------- módulo iam
+    subgraph cluster_iam {
+        label = "modules/iam"; style = "rounded,filled"; fillcolor = "#fffbe8"; color = "#b38f00";
+
+        role_glue [label = "aws_iam_role  <p>-glue-role\nAWSGlueServiceRole\n+ policy inline: S3 solo del bucket lake",
+                   shape = hexagon, fillcolor = "#fff4cc"];
+    }
+
+    // ---------------------------------------------------------------- módulo cloudwatch
+    subgraph cluster_cloudwatch {
+        label = "modules/cloudwatch  (retención 7 días)"; style = "rounded,filled"; fillcolor = "#f4f4f4"; color = "#6b6b6b";
+
+        lg_err [label = "/aws-glue/<p>/error", shape = cylinder];
+        lg_out [label = "/aws-glue/<p>/output", shape = cylinder];
+        lg_sfn [label = "/aws/vendedlogs/states/<p>-pipeline", shape = cylinder];
+    }
+
+    // No gestionado por Terraform (hallazgo: lo impone Glue y es compartido por la cuenta).
+    lg_crawlers [label = "/aws-glue/crawlers\nCOMPARTIDO por la cuenta\nNO gestionado por Terraform\n(1 log stream por crawler)",
+                 shape = cylinder, style = "filled,dashed", fillcolor = "#fafafa", color = "#999999", fontcolor = "#666666"];
+
+    // ================================================================ flujo
+    generator -> bronze [label = "1. upload CSV", penwidth = 1.6];
+    bronze    -> notify [label = "Object Created", style = dotted, arrowhead = none];
+    notify    -> rule   [label = "2. evento", penwidth = 1.6];
+    rule      -> target [penwidth = 1.6];
+    target    -> st_b2s [label = "3. StartExecution", penwidth = 1.6, lhead = cluster_sfn_machine];
+
+    st_b2s  -> job_b2s [label = "ejecuta"];
+    st_cw_s -> cr_s    [label = "ejecuta"];
+    st_s2g  -> job_s2g [label = "ejecuta"];
+    st_cw_g -> cr_g    [label = "ejecuta"];
+
+    code    -> job_b2s [label = "script + SQL + contrato\n(--extra-files)", style = dotted, color = "#7fb28a"];
+    code    -> job_s2g [style = dotted, color = "#7fb28a"];
+
+    bronze  -> job_b2s [label = "lee CSV"];
+    job_b2s -> silver  [label = "escribe Parquet\n(valida contrato)"];
+    silver  -> job_s2g [label = "lee"];
+    job_s2g -> gold    [label = "escribe Parquet\n(valida contrato)"];
+    {job_b2s job_s2g} -> tmp [style = dotted, arrowhead = none, color = "#7fb28a"];
+
+    silver -> cr_s [label = "rastrea"];
+    gold   -> cr_g [label = "rastrea"];
+    cr_s   -> t_s  [label = "crea/actualiza esquema"];
+    cr_g   -> t_g  [label = "crea/actualiza esquema"];
+
+    t_g -> analyst [label = "consulta esquema / datos"];
+
+    // ================================================================ IAM (asume rol)
+    edge [style = dashed, color = "#b38f00", fontcolor = "#8a6d00", arrowhead = empty];
+    target    -> role_events [label = "usa rol"];
+    st_b2s    -> role_sfn    [label = "usa rol", ltail = cluster_sfn_machine];
+    {job_b2s job_s2g cr_s cr_g} -> role_glue [label = "asumen"];
+
+    // ================================================================ logs
+    edge [style = dotted, color = "#6b6b6b", fontcolor = "#555555", arrowhead = vee, label = ""];
+    {job_b2s job_s2g} -> lg_err;
+    {job_b2s job_s2g} -> lg_out;
+    st_ok   -> lg_sfn [ltail = cluster_sfn_machine, label = "logs de ejecución (ALL)"];
+    {cr_s cr_g} -> lg_crawlers [color = "#aaaaaa"];
+}

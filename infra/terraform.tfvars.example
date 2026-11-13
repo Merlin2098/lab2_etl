@@ -1,0 +1,11 @@
+# Copiar a terraform.tfvars (gitignored) y ajustar.
+project_name = "lab2-etl"
+environment  = "dev"
+aws_region   = "us-east-1"
+owner        = "data-engineering"
+cost_center  = "bootcamp-aws-dea"
+
+# false = el pipeline no se dispara al subir el CSV; se ejecuta a mano.
+enable_event_trigger = true
+
+tags = {}

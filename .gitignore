@@ -1,0 +1,101 @@
+# =========================
+# 🐍 Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging metadata (project is not distributed as a package; see [tool.uv] package = false)
+*.egg-info/
+
+# Python tooling caches
+.mypy_cache/
+.pytest_cache/
+pytest-cache-files-*/
+.pytest-tmp/
+.ruff_cache/
+
+# Build / packaging
+build/
+dist/
+
+# =========================
+# 🧪 Logs & runtime artifacts
+# =========================
+logs/
+*.log
+
+
+# =========================
+# 🏗️ Terraform
+# =========================
+.terraform/
+**/.terraform/
+
+# State files
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+tfplan-artifact
+tfplan-destroy
+*tfplan*
+
+# Crash logs
+crash.log
+
+# Terraform local backend / overrides
+backend.tf
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# =========================
+# 🔐 Terraform variables (SENSITIVE)
+# =========================
+*.tfvars
+*.auto.tfvars
+
+# Allow examples
+!*.example
+
+# =========================
+# 🔑 Environment variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# 🛠️ IDE / Editor
+# =========================
+.vscode/
+
+# =========================
+# 💻 OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# 📦 Local lab artifacts
+# =========================
+# Course material and generated CSVs stay local
+data/
+docs/prompt
+
+# =========================
+# 🤖 Claude Code
+# =========================
+# Project permissions tracked (settings.json); session-local state is not
+.claude/settings.local.json
+
+# Renders sueltos del diagrama (el oficial es docs/architecture/arch2.png)
+architecture.svg
+architecture.png

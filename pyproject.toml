@@ -1,0 +1,27 @@
+[project]
+name = "lab2-etl-glue-medallion"
+version = "0.1.0"
+requires-python = ">=3.11,<3.14"
+# Solo dependencias locales del lab. Los Glue jobs usan el runtime de Glue
+# (PySpark, boto3) y no necesitan instalar nada extra.
+dependencies = [
+    "boto3==1.35.49",        # subir CSV a bronze/ y tests en tests/aws/
+    "pandas==3.0.2",         # inspeccionar Parquet de silver/gold en local
+    "pyarrow==23.0.1",       # lector Parquet para pandas
+    "python-dotenv==1.2.2",  # cargar .env.credentials
+    "pyyaml==6.0.3",         # configuración en src/config/
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.3",
+    "ruff==0.15.12",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "cloud: tests that require live AWS credentials (skipped without them)",
+]
+
+[tool.uv]
+package = false

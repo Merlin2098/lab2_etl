@@ -1,0 +1,20 @@
+{
+  "table": "gold_desempeno_rutas",
+  "layer": "gold",
+  "s3_prefix": "gold/desempeno_rutas/",
+  "description": "KPIs operativos y comerciales por fecha de despacho y ruta. Excluye envíos CANCELADO.",
+  "primary_key": ["fecha_despacho", "origen", "destino"],
+  "columns": [
+    {"name": "fecha_despacho", "type": "date", "comment": "Dimensión: fecha de despacho"},
+    {"name": "origen", "type": "string", "comment": "Dimensión: ciudad de origen"},
+    {"name": "destino", "type": "string", "comment": "Dimensión: ciudad de destino"},
+    {"name": "envios_total", "type": "bigint", "comment": "Envíos no cancelados"},
+    {"name": "envios_entregados", "type": "bigint", "comment": "Envíos con estado ENTREGADO"},
+    {"name": "envios_a_tiempo", "type": "bigint", "comment": "Entregados con fecha_entrega <= fecha_entrega_prometida"},
+    {"name": "otd_pct", "type": "decimal(5,2)", "comment": "envios_a_tiempo / envios_entregados * 100"},
+    {"name": "dias_transito_prom", "type": "decimal(6,2)", "comment": "Promedio de días despacho -> entrega (sólo entregados)"},
+    {"name": "peso_total_kg", "type": "decimal(14,2)", "comment": "Suma de peso_kg"},
+    {"name": "ingreso_total_pen", "type": "decimal(14,2)", "comment": "Suma de tarifa_pen"},
+    {"name": "ingreso_por_kg_pen", "type": "decimal(10,4)", "comment": "ingreso_total_pen / peso_total_kg"}
+  ]
+}

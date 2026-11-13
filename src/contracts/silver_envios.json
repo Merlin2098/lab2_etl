@@ -1,0 +1,20 @@
+{
+  "table": "silver_envios",
+  "layer": "silver",
+  "s3_prefix": "silver/envios/",
+  "description": "Un registro por envío único y válido, tipado y normalizado.",
+  "primary_key": ["envio_id"],
+  "columns": [
+    {"name": "envio_id", "type": "string", "comment": "Guía de remisión; sin vacíos, deduplicado"},
+    {"name": "cliente_id", "type": "string", "comment": "Cliente que contrata el servicio"},
+    {"name": "fecha_despacho", "type": "date", "comment": "Salida del camión desde el origen"},
+    {"name": "fecha_entrega_prometida", "type": "date", "comment": "Fecha comprometida con el cliente"},
+    {"name": "fecha_entrega", "type": "date", "comment": "Entrega real; nulo si no se entregó"},
+    {"name": "origen", "type": "string", "comment": "Ciudad de origen"},
+    {"name": "destino", "type": "string", "comment": "Ciudad de destino"},
+    {"name": "tipo_carga", "type": "string", "comment": "GENERAL | REFRIGERADA | PELIGROSA"},
+    {"name": "peso_kg", "type": "decimal(10,2)", "comment": "Peso facturable"},
+    {"name": "tarifa_pen", "type": "decimal(12,2)", "comment": "Monto facturado en soles"},
+    {"name": "estado", "type": "string", "comment": "ENTREGADO | EN_TRANSITO | CANCELADO"}
+  ]
+}
